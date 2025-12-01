@@ -34,7 +34,7 @@ from orders.models import Action, Strategy, StockEx, Order, ActionCategory, Job,
                  
 from core import caller
 
-from trading_bot.settings import _settings
+from general_settings.models import SchedulerSettings, AlertSettings
 
 from datetime import time, datetime, timedelta, date
 import requests
@@ -112,32 +112,35 @@ class MyScheduler():
         self.update_ss=True
         self.cleaning=True
         
+        scheduler_settings=SchedulerSettings.objects.get(pk=1)
+        alert_settings=AlertSettings.objects.get(pk=1)
+        
         for s_ex in StockEx.objects.all():
-            start_check_time=self.shift_time(s_ex.opening_time,_settings["OPENING_CHECK_MINUTE_SHIFT"],s_ex.timezone) #perform the check 5 min after opening
-            if _settings["PF_CHECK"]:
+            start_check_time=self.shift_time(s_ex.opening_time,scheduler_settings.opening_check_minute_shift,s_ex.timezone) #perform the check 5 min after opening
+            if scheduler_settings.pf_check:
                 self.do_weekday(start_check_time, self.check_pf, s_ex=s_ex, opening=True)
-            if _settings["INDEX_CHECK"]:
+            if scheduler_settings.index_check:
                 self.do_weekday(start_check_time, self.check_pf, it_is_index=True,s_ex=s_ex, opening=True)
-            if _settings["REPORT"] and s_ex.calc_report:
-                report_time=self.shift_time(s_ex.closing_time,-_settings["DAILY_REPORT_MINUTE_SHIFT"],s_ex.timezone) #write report 15 min before closing, so we have 15 min to calculate and pass the orders
+            if scheduler_settings.report and s_ex.calc_report:
+                report_time=self.shift_time(s_ex.closing_time,-scheduler_settings.daily_report_minute_shift,s_ex.timezone) #write report 15 min before closing, so we have 15 min to calculate and pass the orders
                 self.do_weekday(report_time,self.daily_report,s_ex=s_ex) 
-            if _settings["INTRADAY"]:
-                self.manager.every(_settings["TIME_INTERVAL_INTRADAY"], 'minutes').do(self.daily_report,s_ex=s_ex,intraday=True)
+            if scheduler_settings.intraday:
+                self.manager.every(scheduler_settings.time_interval_interday, 'minutes').do(self.daily_report,s_ex=s_ex,intraday=True)
                 
-        if _settings["PF_CHECK"]:
-            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf)
-        if _settings["INDEX_CHECK"]:
-            self.manager.every(_settings["TIME_INTERVAL_CHECK"], 'minutes').do(self.check_pf,it_is_index=True)
-        if _settings["HEARTBEAT"]: # to test if telegram is working ok
+        if scheduler_settings.pf_check:
+            self.manager.every(alert_settings.time_interval_check, 'minutes').do(self.check_pf)
+        if scheduler_settings.index_check:
+            self.manager.every(alert_settings.time_interval_check, 'minutes').do(self.check_pf,it_is_index=True)
+        if scheduler_settings.heartbeat: # to test if telegram is working ok
             self.manager.every(10, 'seconds').do(self.heartbeat_f)
-        if _settings["HEARTBEAT_IB"]:
+        if scheduler_settings.heartbeat_ib:
             self.manager.every(10, 'seconds').do(self.heartbeat_ib_f)
         if self.cleaning:
             self.do_weekday(time(16,2,tzinfo=ZoneInfo('US/Eastern')),self.cleaning_f) #after end of the day
-        if _settings["UPDATE_SLOW_STRAT"]:
+        if scheduler_settings.update_slow_strat:
             self.do_weekday(time(10,00,tzinfo=ZoneInfo('Europe/Paris')), self.update_slow_strat) #performed away from the opening
         if self.update_ss:
-            self.manager.every(_settings["TIME_INTERVAL_UPDATE"], 'minutes').do(actualize_ss)
+            self.manager.every(alert_settings.time_interval_update, 'minutes').do(actualize_ss)
 
         #the "background is created by celery"
         #OOTB vbt start_in_background does not seem to be compatible with django
@@ -236,21 +239,23 @@ class MyScheduler():
             opportunity=False
             if ratio is None:
                 print("ratio is None for "+action.symbol)
+                
+            alert_settings=AlertSettings.objects.get(pk=1)
 
             if self.check_stock_ex_open_from_action(action) and ratio is not None:
-                if (short and ratio>_settings["ALERT_THRESHOLD"]) or (not short and ratio < -_settings["ALERT_THRESHOLD"]):
+                if (short and ratio> alert_settings.alert_threshold) or (not short and ratio < -alert_settings.alert_threshold):
                     alerting=True
-                    if (short and ratio>_settings["ALARM_THRESHOLD"]) or (not short and ratio<-_settings["ALARM_THRESHOLD"]):
+                    if (short and ratio>alert_settings.alarm_threshold) or (not short and ratio<-alert_settings.alarm_threshold):
                         alarming=True     
                     
-                if (short and ratio<(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])) or \
-                    (not short and ratio > -(_settings["ALERT_THRESHOLD"]-_settings["ALERT_HYST"])):
+                if (short and ratio<(alert_settings.alert_threshold-alert_settings.alert_hyst)) or \
+                    (not short and ratio > -(alert_settings.alert_threshold-alert_settings.alert_hyst)):
                     alerting_reco=True    
                     
-                if (opportunity and not short and ratio>_settings["ALERT_THRESHOLD"]):
+                if (opportunity and not short and ratio>alert_settings.alert_threshold):
                     alerting=True
                     opportunity=True
-                    if ratio>_settings["ALARM_THRESHOLD"]:
+                    if ratio>alert_settings.alarm_threshold:
                         alarming=True     
                 
                 c1 = Q(action=action)

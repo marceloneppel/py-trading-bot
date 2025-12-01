@@ -16,6 +16,13 @@ else:
     import backports.zoneinfo as zoneinfo
     from backports.zoneinfo import ZoneInfo
     
+from general_settings.models import OrderSettings
+
+try:
+    order_settings=OrderSettings.objects.get(pk=1)
+except:
+    pass
+
 tz_Paris=ZoneInfo('Europe/Paris')
 
 all_tz=[]
@@ -40,80 +47,6 @@ def check_if_index(action):
         return True
     else:
         return False
-
-def check_ib_permission(symbols: list, verbose: bool=True):
-    '''
-    Populate USED_API from USED_API_DEFAULT
-    Check if IB can be used, otherwise YF is the fallback. For CCXT, MT5 and TS there is nothing to check.
-    
-    Needs to be performed for each set of symbols reported
-
-    Arguments
-    ----------
-       symbols: list of YF tickers
-    '''
-    for k, v in _settings["USED_API_DEFAULT"].items():
-        if v in ["CCXT","MT5","TS"]:
-            _settings["USED_API"][k]=v
-        elif v=="IB":
-            _settings["USED_API"][k]="IB"
-            if symbols is not None: #symbol none -> clear
-                for symbol in symbols:
-                    if symbol in _settings["IB_STOCK_NO_PERMISSION"]:
-                        if verbose:
-                            logger.info("symbol " + symbol + " has no permission for IB")
-                        _settings["USED_API"][k]="YF"
-                        break
-                    
-                    a=Action.objects.get(symbol=symbol)      
-                    if a.stock_ex.ib_auth==False:
-                        if verbose:
-                            logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
-                        _settings["USED_API"][k]="YF"
-                        break
-        elif v=="YF":
-            _settings["USED_API"][k]=v
-    
-def get_exchange_actions(exchange:str,sec: str=None):
-    '''
-    Get lists of actions for the reporting
-
-    Arguments
-    ----------
-        exchange: name of the stock exchange
-        sec: name of the sector
-    '''
-    cat=ActionCategory.objects.get(short="ACT")
-    
-    try:
-        stock_ex=StockEx.objects.get(name=exchange)
-    except:
-        raise ValueError("Stock exchange: "+str(exchange)+" not found, create it in the admin panel")
-    
-    c1 = Q(category=cat)
-    c2 = Q(stock_ex=stock_ex)
-    c3 = Q(delisted=False) #to be removed
-    
-    print(stock_ex.presel_at_sector_level)
-    print(sec)
-    
-    if stock_ex.presel_at_sector_level and sec is not None:
-        action_sector, _=ActionSector.objects.get_or_create(name=sec)
-        print(action_sector)
-        c4 = Q(sector=action_sector)
-        actions=Action.objects.filter(c1 & c3 & c4) #c2 & no actual reason, but I use mix of Nasdaq and NYSE for sector
-    else:
-        actions=Action.objects.filter(c1 & c2 & c3)
-        
-    if len(actions)==0: #fallback for EUREX for instance
-        cat=ActionCategory.objects.get(short="IND")
-        c1 = Q(category=cat)
-        actions=Action.objects.filter(c1 & c2 & c3)
-
-    if _settings["USED_API"]["reporting"]=="":
-        check_ib_permission([a.symbol for a in actions])
-
-    return actions
 
 def period_YF_to_ib(period: str): #see also split_freq_str in vbt
     '''
@@ -285,6 +218,10 @@ def filter_intro_action(
     input_actions: list of products to be tested
     y_period: period of time in year where we need to check backward from now
     '''
+    
+    if type(y_period)==str: #to avoid bug in case a "3y" comes
+        y_period=int(''.join(x for x in y_period if x.isdigit()))
+    
     actions=[]
     for a in input_actions:
         if filter_intro_sub(a,y_period):
@@ -443,7 +380,15 @@ class Strategy(models.Model):
         
     def __str__(self):
         return self.name
+
+#Good idea, but won't work if django offline, makes too much complexity
     
+#class SlowStrategy(Strategy):
+#    days_frequency=models.IntegerField(null=False, blank=False, verbose_name="Days frequency, how often will the slow strategy run")
+#    max_candidates_nb=models.IntegerField(default=1,verbose_name="max candidates numbers, how many stocks can be considered at the same time")
+#    distance=models.IntegerField(null=True, blank=True,verbose_name="distance, in days, may be use to perform a calculation between values separated by the distance")
+#    hold_duration= models.IntegerField(null=True,blank=True)     
+
 class StockEx(models.Model):
     '''
     Stock exchange
@@ -770,3 +715,92 @@ class Job(models.Model):
     
     def __str__(self):
         return self.strategy.name + "_" + self.stock_ex.name
+ 
+    
+ 
+class IBSettings(models.Model):
+     localhost=models.CharField(max_length=100, blank=False,default='127.0.0.1')
+     port=models.IntegerField(default=7496,verbose_name="IB port, typically 7496 for TWS and 4001 for IB Gateway") #IB Gateway 4001, TWS 7496
+     base_currency=models.ForeignKey('Currency',on_delete=models.RESTRICT,null=True)
+     etf_auth=models.BooleanField(default=False)
+     stocks_no_permission=models.ManyToManyField(Action,blank=True, related_name="stock_no_permission")    
+
+ib_settings=IBSettings.objects.get(pk=1)
+
+def check_ib_permission(symbols: list, verbose: bool=True):
+    '''
+    Populate USED_API from USED_API_DEFAULT
+    Check if IB can be used, otherwise YF is the fallback. For CCXT, MT5 and TS there is nothing to check.
+    
+    Needs to be performed for each set of symbols reported
+
+    Arguments
+    ----------
+       symbols: list of YF tickers
+    '''
+    d={
+       "orders": order_settings.default_api_orders.name, 
+       "alerting":order_settings.default_api_alerting.name, 
+       "reporting":order_settings.default_api_reporting.name, 
+       }
+
+    for k, v in d.items():  #order_settings.default_api_alerting.name, 
+        if v in ["CCXT","MT5","TS"]:
+            _settings["USED_API"][k]=v
+        elif v=="IB":
+            stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
+            _settings["USED_API"][k]="IB"
+            if symbols is not None: #symbol none -> clear
+                for symbol in symbols:
+                    if symbol in stocks_no_permission_symbols:
+                        if verbose:
+                            logger.info("symbol " + symbol + " has no permission for IB")
+                        _settings["USED_API"][k]="YF"
+                        break
+                    
+                    a=Action.objects.get(symbol=symbol)      
+                    if a.stock_ex.ib_auth==False:
+                        if verbose:
+                            logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
+                        _settings["USED_API"][k]="YF"
+                        break
+        elif v=="YF":
+            _settings["USED_API"][k]=v
+    
+def get_exchange_actions(exchange:str,sec: str=None):
+    '''
+    Get lists of actions for the reporting
+
+    Arguments
+    ----------
+        exchange: name of the stock exchange
+        sec: name of the sector
+    '''
+    cat=ActionCategory.objects.get(short="ACT")
+    
+    try:
+        stock_ex=StockEx.objects.get(name=exchange)
+    except:
+        raise ValueError("Stock exchange: "+str(exchange)+" not found, create it in the admin panel")
+    
+    c1 = Q(category=cat)
+    c2 = Q(stock_ex=stock_ex)
+    c3 = Q(delisted=False) #to be removed
+        
+    if stock_ex.presel_at_sector_level and sec is not None:
+        action_sector, _=ActionSector.objects.get_or_create(name=sec)
+        print(action_sector)
+        c4 = Q(sector=action_sector)
+        actions=Action.objects.filter(c1 & c3 & c4) #c2 & no actual reason, but I use mix of Nasdaq and NYSE for sector
+    else:
+        actions=Action.objects.filter(c1 & c2 & c3)
+        
+    if len(actions)==0: #fallback for EUREX for instance
+        cat=ActionCategory.objects.get(short="IND")
+        c1 = Q(category=cat)
+        actions=Action.objects.filter(c1 & c2 & c3)
+
+    if _settings["USED_API"]["reporting"]=="":
+        check_ib_permission([a.symbol for a in actions])
+
+    return actions

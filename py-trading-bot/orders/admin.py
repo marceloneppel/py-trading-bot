@@ -12,7 +12,8 @@ admin.site.register(Strategy)
 admin.site.register(Candidates)
 admin.site.register(Excluded)
 admin.site.register(Job)
- 
+admin.site.register(IBSettings)
+
 class OrderAdmin(admin.ModelAdmin):
     list_filter = ('active',)
 
