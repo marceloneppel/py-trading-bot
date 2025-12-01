@@ -1,0 +1,50 @@
+<h1>Download data from Interactive Brokers</h1>
+
+<p>Choose between stock exchange, sector or stocks. Stocks have the priority. If using actions, pay attention to select only stocks of the same stock exchange, otherwise your dataset will most probably be empty.</p>
+
+<form method='post' action=''>
+    {% csrf_token %}
+    <div class="fieldWrapper">
+        <label>(Optional) Stock exchange:</label><br/>
+        {{ form.stock_ex}}
+    </div>
+    <div class="fieldWrapper">
+        <label>(Optional) Sector:</label><br/>
+        {{form.sector }}
+    </div>
+    <div class="fieldWrapper">
+        <label>(Optional) Stocks:</label><br/>
+        {{form.actions }}
+    </div>
+ 
+    <div class="fieldWrapper">
+        <label>(Optional) End date:<br/>
+         Format: YYYY-MM-DD<br/>
+        </label>
+        {{form.end }}
+    </div>            
+    <div class="fieldWrapper">
+        <label>(Optional) Period:<br/>
+        <span>Shape: [x] D [y] M [z] Y</span><br/>
+        </label>
+        {{form.period }}
+    </div>    
+    <div class="fieldWrapper">
+        <label>(Optional) Timeframe:<br/>
+        <span>Shape: [x] mins [y] hours [z] day</span><br/>
+        </label>
+        {{form.timeframe }}
+    </div>
+    <div class="fieldWrapper">
+        <label>Add the index (Dow Jones, Nasdaq composite...) to the data set</label><br/>
+        {{form.add_index }}
+    </div>  
+    <div class="fieldWrapper">
+        <label>Filename:</label><br/>
+        {{form.filename }}
+    </div>     
+
+    <br/>
+    <input type="submit" value="Start the download">
+</form>
+

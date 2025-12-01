@@ -1,0 +1,55 @@
+<h1>Download data from Yahoo Finance</h1>
+
+<p>Choose between stock exchange, sector or stocks. Stocks have the priority. If using actions, pay attention to select only stocks of the same stock exchange, otherwise your dataset will most probably be empty.</p>
+<p>For the time input, choose between start-end and period, as by the YFfinance library.</p>
+
+<form method='post' action=''>
+    {% csrf_token %}
+    <div class="fieldWrapper">
+        <label>(Optional) Stock exchange:</label><br/>
+        {{ form.stock_ex}}
+    </div>
+    <div class="fieldWrapper">
+        <label>(Optional) Sector:</label><br/>
+        {{form.sector }}
+    </div>
+    <div class="fieldWrapper">
+        <label>(Optional) Stocks:</label><br/>
+        {{form.actions }}
+    </div>
+    <div class="fieldWrapper">
+        <label>(Optional) Start date:<br/>
+        Format: YYYY-MM-DD<br/>
+        </label>
+        {{form.start }}
+    </div>    
+    <div class="fieldWrapper">
+        <label>(Optional) End date:<br/>
+        Format: YYYY-MM-DD<br/>
+        </label>
+        {{form.end }}
+    </div>            
+    <div class="fieldWrapper">
+        <label>(Optional) Period:<br/>
+        <span>Possible values: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max</span><br/>
+        </label>
+        {{form.period }}
+    </div>    
+    <div class="fieldWrapper">
+        <label>(Optional) Timeframe:<br/>
+        <span>Possible values: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo</span><br/>
+        </label>
+        {{form.timeframe }}
+    </div>
+    <div class="fieldWrapper">
+        <label>Add the index (Dow Jones, Nasdaq composite...) to the data set</label><br/>
+        {{form.add_index }}
+    </div>  
+    <div class="fieldWrapper">
+        <label>Filename:</label><br/>
+        {{form.filename }}
+    </div>     
+    <br/>
+    <input type="submit" value="Start the download">
+</form>
+

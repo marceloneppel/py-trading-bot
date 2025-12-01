@@ -37,10 +37,10 @@ def retrieve_data_online(o,
                   period: str=None,
                   it_is_index: bool=False,
                   used_api_key:str="reporting",
-                  save:bool=False,
                   start: str=None,
                   end: str=None,
-                  file_name: str="NAME"
+                  timeframe: str=None,
+                  add_index: bool=True
                   ) -> (bool, list):
     """
     Retrieve the data using any API
@@ -75,7 +75,9 @@ def retrieve_data_online(o,
                         period=period,
                         it_is_index=it_is_index,
                         start=start,
-                        end=end)
+                        end=end,
+                        timeframe=timeframe,
+                        add_index=add_index)
                 except Exception as e:
                     logger.error(e, stack_info=True, exc_info=True)
             elif used_api in ["CCXT","MT5","TS"]:
@@ -86,7 +88,9 @@ def retrieve_data_online(o,
                         period=period,
                         it_is_index=it_is_index,
                         start=start,
-                        end=end)
+                        end=end,
+                        timeframe=timeframe,
+                        add_index=add_index)
                 except Exception as e:
                     logger.error(e, stack_info=True, exc_info=True)
             #separated as could be used for fallback
@@ -100,22 +104,25 @@ def retrieve_data_online(o,
                     end=end)
             _settings["USED_API"][used_api_key]=used_api #save potential change
 
-            if save:
-                data.to_hdf(path_or_buf=os.path.join(BASE_DIR,'saved_cours/'+file_name.upper()+'_period.h5'))
-    
             if data is None:
                 return None
             else:
                 o.data=data.select_symbols(symbols)
-                o.data_ind=data.select_symbols(index_symbol)
+                
+                if index_symbol is not None:
+                    o.data_ind=data.select_symbols(index_symbol)
                 
                 for l in ["Close","Open","High","Low","Volume"]:
                     setattr(o,l.lower(),o.data.get(l))
-                    setattr(o,l.lower()+"_ind",o.data_ind.get(l))
                     
+                    if index_symbol is not None:
+                        setattr(o,l.lower()+"_ind",o.data_ind.get(l))
+                    
+                print(index_symbol)
                 logger.info("number of days retrieved: " + str(np.shape(o.close)[0]))
-                if len(o.open_ind)==0 or len(o.open_ind)==0:
-                    raise Exception("Retrieve data failed and returned empty Dataframe, check the tickers, tickers: " +str(symbols) + ", index ticker: " + str(index_symbol))
+                if index_symbol is not None and add_index:
+                    if len(o.open_ind)==0 or len(o.open_ind)==0:
+                        raise Exception("Retrieve data failed and returned empty Dataframe, check the tickers, tickers: " +str(symbols) + ", index ticker: " + str(index_symbol))
         
                 return symbols, symbols_to_YF #can be IB or YF symbols
         except Exception as e:
@@ -130,6 +137,10 @@ def retrieve_data_ib(
         start: str=None,
         end: str='',
         timeframe: str="1 day",
+        bypass_conversion: bool=False,
+        save:bool=False,
+        filename: str="NAME",
+        add_index: bool=True,
         **kwargs
         ) -> (pd.core.frame.DataFrame, list, str):
     """
@@ -146,18 +157,23 @@ def retrieve_data_ib(
         start: start date for the data -> not supported
         end: end date for the data    
         timeframe: interval of time between each sample
+        save: should the downloaded data be saved locally
+        filename: name of the file to be saved
     """   
     try:
         if start is not None:
             warnings.warn("Start is not supported by retrieve_data_ib, use period!")
         
-        period=period_YF_to_ib(period)
-        timeframe=interval_YF_to_ib(timeframe)
+        if not bypass_conversion:
+            period=period_YF_to_ib(period)
+            timeframe=interval_YF_to_ib(timeframe)
         exchanges={}
         it_is_indexes={}
         currencies={}
         ib_symbols=[]
         symbols_to_YF={}
+        index_symbol_ib=None
+        all_symbols=None
         
         for a in actions:
             ib_symbol=a.ib_ticker()
@@ -174,12 +190,14 @@ def retrieve_data_ib(
             index_symbol=ib_symbols[0]
             all_symbols=ib_symbols
             index_symbol_ib=index_symbol
-        else:
+        elif add_index:
             index_symbol_ib, index_symbol=exchange_to_index_symbol(actions[0].stock_ex) 
             all_symbols= ib_symbols+[index_symbol_ib]
             it_is_indexes[index_symbol_ib]=True
             action=Action.objects.get(symbol=index_symbol)
             exchanges[index_symbol_ib]=action.stock_ex.ib_ticker  
+        else:
+            all_symbols= ib_symbols
             
         ok=False
         #test if the symbols were downloaded
@@ -204,6 +222,9 @@ def retrieve_data_ib(
                     ok=False
                     ib_symbols.remove(s)
                     all_symbols.remove(s)
+        
+        if save:
+            data.to_hdf(path_or_buf=os.path.join(BASE_DIR,'saved_cours/'+filename+'.h5'))
 
         return data,\
             ib_symbols,\
@@ -220,6 +241,9 @@ def retrieve_data_notIB(
         start: str=None,
         end: str=None,
         timeframe: str="1 day",
+        save:bool=False,
+        filename: str="NAME",
+        add_index: bool=True
         )-> (pd.core.frame.DataFrame, list, str):
     """
     Retrieve the data using YF
@@ -234,6 +258,8 @@ def retrieve_data_notIB(
         start: start date for the data -> not supported
         end: end date for the data  
         timeframe: interval of time between each sample
+        save: should the downloaded data be saved locally
+        filename: name of the file to be saved
     """
     #add the index to the list of stocks downloaded. Useful to make calculation on the index to determine trends
     #by downloading at the same time, we are sure the signals are aligned
@@ -247,16 +273,20 @@ def retrieve_data_notIB(
         f=getattr(vbt,used_api_to_class[used_api])
         symbols=[a.symbol for a in actions]
         symbols_to_YF={}
-        
+        index_symbol=None
+        all_symbols=None
+    
         for s in symbols:
             symbols_to_YF[s]=s
         
         if it_is_index:
             index_symbol=symbols[0]
             all_symbols=symbols
-        else:
+        elif add_index:
             _, index_symbol=exchange_to_index_symbol(actions[0].stock_ex)  
             all_symbols=symbols+[index_symbol]
+        else:
+            all_symbols=symbols
             
         ok=False
         first_round=True
@@ -305,7 +335,10 @@ def retrieve_data_notIB(
                     ok=False
                     symbols.remove(s)
                     all_symbols.remove(s)
-
+                    
+        if save:
+            data.to_hdf(path_or_buf=os.path.join(BASE_DIR,'saved_cours/'+filename+'.h5'))
+            
         return data,\
                symbols,\
                index_symbol,\
