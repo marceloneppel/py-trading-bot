@@ -23,7 +23,10 @@ class StratLIVE(UnderlyingStrat):
             ):
         """
         Function to back stage recent data
+        
         Called outside of Django!!!
+        Scanner replaces it for being started within Django
+        
         As strat but adapted to download every time the data
         
         Arguments

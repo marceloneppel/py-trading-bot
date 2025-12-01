@@ -2,15 +2,18 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from reporting.telegram import start, cleaning_sub
 # Create your views here.
-from reporting.models import Report, ActionReport, Alert, OrderExecutionMsg 
+from reporting.models import Report, ActionReport, Alert, OrderExecutionMsg, Scan
 from reporting.scanner import Scanner
 from orders.models import Action, StockStatus, exchange_to_index_symbol, ActionSector, StockEx, Job,\
-                          get_exchange_actions, Strategy, filter_intro_action
-         
+                          get_exchange_actions, Strategy, filter_intro_action, ActionCategory
+from reporting.forms import ScanForm, DownloadYFForm, DownloadIBForm
+from core.data_manager_online import retrieve_data_ib, retrieve_data_notIB
+
 from orders.ib import actualize_ss
 from core import caller
 from .filter import ReportFilter
 from django.utils import timezone
+import json
 
 def reportsView(request): 
     reports= Report.objects.all()
@@ -18,17 +21,17 @@ def reportsView(request):
     return render(request, 'reporting/reports.html', context)
 
 def reportView(request,pk):
-    report= Report.objects.filter(id=pk)
+    report= Report.objects.get(id=pk)
     ars=ActionReport.objects.filter(report=pk)
 
-    context={'report':report[0], 'ars':ars}
+    context={'report':report, 'ars':ars}
     return render(request, 'reporting/report.html', context)
     
 def trendView(request,pk): 
-    report= Report.objects.filter(id=pk)
+    report= Report.objects.get(id=pk)
     ars=ActionReport.objects.filter(report=pk)
     
-    context={'report':report[0], 'ars':ars}
+    context={'report':report, 'ars':ars}
     return render(request, 'reporting/trend.html', context)
 
 def alertsView(request): 
@@ -134,11 +137,127 @@ def trigger_all_jobs(request):
         j.save()
     return HttpResponse("All jobs ran")
 
-def scan(request):
-    s=Scanner(restriction=90,fees=0.0005)
+def triggerScanView(request):
+    if request.method == "POST":
+        form = ScanForm(request.POST)
+
+        if form.is_valid():
+            return scan(
+                list_of_exchanges=form.cleaned_data["list_of_exchanges"],
+                list_of_sectors=form.cleaned_data["list_of_sectors"],
+                strategies_to_scan=form.cleaned_data["strategies_to_scan"],
+                period=form.cleaned_data["period"],
+                restriction=form.cleaned_data["restriction"],
+                fees=form.cleaned_data["fees"]
+                )
+    else:
+        form = ScanForm()
+    return render(request, "reporting/trigger_scan.html", {"form": form})
+
+def scan(**kwargs):
+    '''
+    Trigger the scan algorithm
+    '''
+    s=Scanner(**kwargs)
     res=s.scan_all()
-    print(res)
-    return HttpResponse("Scan ran successfully")
+
+    return HttpResponse("Scan ran successfully " + str(res))
+
+def scansView(request): 
+    scans= Scan.objects.all()
+    context={'scans': scans}
+    return render(request, 'reporting/scans.html', context)
+
+def scanView(request,pk):
+    scan=Scan.objects.get(id=pk)
+    result_dic=json.loads(scan.results.replace("\'", "\""))
+    context={'scan':scan,'result_dic':result_dic}
+
+    return render(request, 'reporting/scan.html', context)
+
+
+def download_sub(form):
+    it_is_index=False
+    
+    actions=form.cleaned_data["actions"]
+
+    if actions is None or len(actions)==0:
+        if form.cleaned_data["sector"] is None:
+            sec=None
+        else:
+            sec=form.cleaned_data["sector"].name
+        
+        actions=get_exchange_actions(form.cleaned_data["stock_ex"].name,sec=sec) 
+    else:
+        it_is_index=True
+        cat=ActionCategory.objects.get(short="IND")
+        for a in actions:    
+            if a.category!=cat:
+                it_is_index=False
+                break
+    return actions, it_is_index
+                                      
+def download_yf(request):
+    if request.method == "POST":
+        form = DownloadYFForm(request.POST)
+        
+        if form.is_valid():
+            actions, it_is_index=download_sub(form)
+
+            arr=retrieve_data_notIB(
+                "YF",
+                actions,
+                form.cleaned_data["period"],
+                it_is_index=it_is_index,
+                start=form.cleaned_data["start"],
+                end=form.cleaned_data["end"],
+                timeframe=form.cleaned_data["timeframe"],
+                save=True,
+                filename=form.cleaned_data["filename"],
+                add_index=form.cleaned_data["add_index"],
+                )
+            if arr is None:
+                return HttpResponse("Download with YF failed")
+            else:
+                return HttpResponse("Download with YF successful")
+        else:
+            return HttpResponse("Form is not valid")            
+    else:
+        form = DownloadYFForm()
+        return render(request, "reporting/download_yf.html", {"form": form})        
+
+def download_ib(request):
+    if request.method == "POST":
+        form = DownloadIBForm(request.POST)
+
+        if form.is_valid():
+            actions, it_is_index=download_sub(form)
+
+            if form.cleaned_data["end"] is None:
+                end="" #default value for IB
+            else:
+                end=form.cleaned_data["end"]
+
+            arr=retrieve_data_ib(
+                actions,
+                form.cleaned_data["period"],
+                it_is_index=it_is_index,
+                end=end,
+                timeframe=form.cleaned_data["timeframe"],
+                bypass_conversion=True,
+                save=True,
+                filename=form.cleaned_data["filename"],
+                add_index=form.cleaned_data["add_index"]
+                )
+            if arr is None:
+                return HttpResponse("Download with IB failed")
+            else:
+                return HttpResponse("Download with IB successful")
+        else:
+            return HttpResponse("Form is not valid")
+    else:
+        form = DownloadIBForm()
+        return render(request, "reporting/download_ib.html", {"form": form})    
 
 def test_order(request):
     symbol=""

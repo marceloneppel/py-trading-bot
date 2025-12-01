@@ -7,19 +7,19 @@ Created on Sun Nov 16 13:09:48 2025
 """
 import vectorbtpro as vbt
 from core.strat import UnderlyingStrat
-from orders.models import get_exchange_actions
+from orders.models import get_exchange_actions, filter_intro_action
 from core.caller import name_to_ust_or_presel
-from trading_bot.settings import _settings
 import numbers
-from orders.models import StockEx
+from orders.models import StockEx, ActionSector
+from reporting.models import Scan
 
 class SingleScanner(UnderlyingStrat):    
     def __init__(
             self,
-            exchange:str,
-            sec: str=None,
-            period: str="3y",
-            strategies_to_scan:list=_settings["STRATEGIES_TO_SCAN"],
+            s_ex:StockEx,
+            strategies_to_scan:list,
+            sec: ActionSector=None,
+            period: int=3,
             restriction:int=None,
             fees: numbers.Number=0,
             ):
@@ -37,14 +37,18 @@ class SingleScanner(UnderlyingStrat):
             restriction : limit the range for the calculation of the return to x market days, 
             fees: fees to be applyed during trades
         """
-        actions=get_exchange_actions(exchange,sec=sec) 
+        if sec is None:
+            actions=get_exchange_actions(s_ex.name) 
+        else:
+            actions=get_exchange_actions(s_ex.name,sec=sec.name) 
+        actions=filter_intro_action(actions,period)
         super().__init__(
-            period=period,
+            period=str(period)+"y",
             prd=True,
             actions=actions,
             )  
 
-        for k in ["strategies_to_scan","period","restriction","fees","exchange","sec"]:
+        for k in ["strategies_to_scan","period","restriction","fees","s_ex","sec"]:
             setattr(self,k,locals()[k])
 
     def scan(
@@ -61,12 +65,12 @@ class SingleScanner(UnderlyingStrat):
             res: result dictionary, progressively filed
         '''
         if self.sec is not None:
-            res[self.sec]={}
+            res[self.sec.name]={}
         else:
-            res[self.exchange]={}
+            res[self.s_ex.name]={}
     
-        for p in self.strategies_to_scan:
-            bti=name_to_ust_or_presel(p, None, self.period,input_ust=self)
+        for strat in self.strategies_to_scan:
+            bti=name_to_ust_or_presel(strat.class_name, None, str(self.period)+"y",input_ust=self)
     
             if self.restriction is not None and type(self.restriction)==int:
                 pf=vbt.Portfolio.from_signals(bti.close[-self.restriction:], 
@@ -92,18 +96,18 @@ class SingleScanner(UnderlyingStrat):
                                      )
             
             if self.sec is not None:
-                res[self.sec][p]=float(round(pf.get_total_return(),2))
+                res[self.sec.name][strat.name]=float(round(pf.get_total_return(),2))
             else:
-                res[self.exchange][p]=float(round(pf.get_total_return(),2))
+                res[self.s_ex.name][strat.name]=float(round(pf.get_total_return(),2))
         return res        
             
 class Scanner():
     def __init__(
             self,
-            list_of_exchanges:list=["XETRA","Nasdaq","NYSE"],  
-            list_of_sector:list=["it"],
-            strategies_to_scan:list=_settings["STRATEGIES_TO_SCAN"],
-            period: str="3y",
+            list_of_exchanges:list,  
+            strategies_to_scan:list,
+            list_of_sectors:list=[],
+            period: int=3,
             restriction:int=None,
             fees: numbers.Number=0,
             ):
@@ -114,37 +118,36 @@ class Scanner():
 
         Arguments
         ----------
-            list_of_exchanges: list of names of the stock exchange
-            sec: sector of the stocks for which we write the report
+            list_of_exchanges: list of the stock exchange (as StockEx)
+            sec: sector of the stocks for which we write the report (as ActionSector)
             period: period of time for which we shall retrieve the data
-            strategies_to_scan: strategies that will be considered in the scan
+            strategies_to_scan: strategies that will be considered in the scan, note that it is passed as queryset from the form
             restriction : limit the range for the calculation of the return to x market days, 
             fees: fees to be applyed during trades
         """        
 
-        for k in ["list_of_exchanges","list_of_sector","strategies_to_scan","period","restriction","fees"]:
+        for k in ["list_of_exchanges","list_of_sectors","strategies_to_scan","period","restriction","fees"]:
             setattr(self,k,locals()[k])
 
     def scan_all(self):
         res={}
-        
-        for exchange in self.list_of_exchanges:
-            s_ex=StockEx.objects.get(name=exchange)
-            
+
+        for s_ex in self.list_of_exchanges:
+       
             if s_ex.presel_at_sector_level:
-                for sec in self.list_of_sector:
+                for sec in self.list_of_sectors:
                     single_scanner=SingleScanner(
-                        exchange,
-                        sec=sec,
+                        s_ex,
+                        sec=sec.name,
                         period=self.period,
-                        strategies_to_scan=self.strategies_to_scan,
+                        strategies_to_scan=self.strategies_to_scan, 
                         restriction=self.restriction,
                         fees=self.fees
                         )
             else:
                 single_scanner=SingleScanner(
-                    exchange,
-                    None,
+                    s_ex,
+                    sec=None,
                     period=self.period,
                     strategies_to_scan=self.strategies_to_scan,
                     restriction=self.restriction,
@@ -152,5 +155,8 @@ class Scanner():
                     )
                 
             res=single_scanner.scan(res)
+            scan=Scan.objects.create()
+        scan.results=str(res)
+        scan.save()
         return res
             

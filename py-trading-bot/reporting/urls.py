@@ -25,5 +25,9 @@ urlpatterns = [
     path('actualize_ss/',views.actualize_ss_view, name="actualize_ss"),
     path('create_ss/',views.create_ss),
     path('actualize_all_jobs',views.trigger_all_jobs),
-    path('scan/',views.scan)
+    path('scan/',views.triggerScanView,name="scan"),
+    path('scans/',views.scansView,name="scans"),
+    path('scan_result/<int:pk>',views.scanView,name="scan_result"),
+    path('download_yf/',views.download_yf,name="download_yf"),
+    path('download_ib/',views.download_ib,name="download_ib"),
     ]
