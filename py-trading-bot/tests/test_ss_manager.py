@@ -11,8 +11,14 @@ from orders import ss_manager
 from orders import models as m
 import pandas as pd
 import reporting.models as m2
+from tests.toolbox import create_general_settings
 
 class TestSSManager(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass() 
+    
     def setUp(self):
         #perform_order is needed to download with IB
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
@@ -20,7 +26,7 @@ class TestSSManager(TestCase):
         self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True,perform_order=True)
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
-        c=m.Currency.objects.create(name="euro",symbol="EUR")
+        c=m.Currency.objects.get(symbol="EUR")
         c2=m.Currency.objects.create(name="US",symbol="USD")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
@@ -480,6 +486,7 @@ class TestSSManager(TestCase):
         self.assertTrue(np.isnan(self.ss_m.target_ss_by_st.loc["AIR.PA","none"]))
 
     def test_perform_orders(self):
+    
         ss7=m.StockStatus.objects.get(action=self.a7)
         self.assertEqual(ss7.quantity,0)
 

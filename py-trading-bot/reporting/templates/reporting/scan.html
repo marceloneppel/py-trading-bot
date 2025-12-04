@@ -1,0 +1,22 @@
+<h1>Scan {{scan.date}}</h1>
+<p>Period in the past in years: {{scan.period}}</p>
+<p>Restriction in days for the return calculation: {{scan.restriction}}</p>
+<p>Fees in percent: {{scan.fees}}</p>
+
+{% for exchange, strategy_dic in result_dic.items %}
+<h2>Stock exchange: {{exchange}}</h2>
+<table>
+<tr>
+<th>Strategy</th>
+<th>Return</th>
+{% for strat_name, strat_res in strategy_dic.items %}
+<tr>
+<td>{{strat_name}}</td>
+<td>{{strat_res}}</td>
+</tr>
+{% endfor %}
+</table>
+{% endfor %}
+
+<p><a href="{% url 'reporting:scans' %}">Scan main page</a></p>
+<p><a href="{% url 'reporting:reports' %}">Main page</a></p>

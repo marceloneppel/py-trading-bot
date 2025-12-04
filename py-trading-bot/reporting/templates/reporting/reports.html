@@ -1,5 +1,5 @@
 <h1>Python Trading bot</h1>
-<p><b>Author: Psemdel, Version: 0.30, <a href="https://github.com/psemdel/py-trading-bot">Github</a></b></p>
+<p><b>Author: Psemdel, Version: 0.22, <a href="https://github.com/psemdel/py-trading-bot">Github</a></b></p>
 <table>
     <tr>
         <td><a href="{% url 'reporting:start_bot' %}">Start bot</a></td>
@@ -19,6 +19,13 @@
     <tr>
         <td><a href="{% url 'reporting:cleaning' %}">Cleaning alerts</a></td>
         <td><a href="{% url 'admin:index' %}">Admin panel</a></td>
+    </tr>
+    <tr>
+        <td><a href="{% url 'reporting:scan' %}">Make a new scan</a></td>
+        <td><a href="{% url 'reporting:scans' %}">View past scans</a></td>
+    </tr>
+        <td><a href="{% url 'reporting:download_yf' %}">Download data via YF</a></td>
+        <td><a href="{% url 'reporting:download_ib' %}">Download data via IB</a></td>
     </tr>
 </table>
 <br/>

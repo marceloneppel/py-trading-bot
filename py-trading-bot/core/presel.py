@@ -322,6 +322,7 @@ class Presel():
             f_name: name of the underlying strategy to be called
         '''
         f=getattr(strat,f_name)
+        
         if self.prd:
             self.ust=f(self.period,prd=True,input_ust=self.ust)
         else:
@@ -392,6 +393,7 @@ class Presel():
             skip_underlying: Don't run the underlying function when optimizing it, as it was already calculated separately
         '''
         try:
+    
             if not skip_underlying:
                 self.underlying()
                 
@@ -1076,6 +1078,7 @@ class PreselWQ(Presel):
             nb:int,
             **kwargs
             ):
+        
         super().__init__(period,**kwargs)
         self.nb=nb
         #preliminary calculation
@@ -1088,6 +1091,9 @@ class PreselWQ(Presel):
             ).out
         self.no_ust=True
         
+    def underlying(self):
+        pass        
+    
     def sub(
             self, 
             i:int,

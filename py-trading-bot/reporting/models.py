@@ -2,8 +2,6 @@ from django.db import models
 
 import math
 
-from trading_bot.settings import _settings
-
 from core.caller import name_to_ust_or_presel
 from core import indicators as ic
 import warnings
@@ -14,6 +12,12 @@ logger_trade = logging.getLogger('trade')
 from orders.models import Action, get_exchange_actions, StockEx,  ActionSector,\
                           check_ib_permission, filter_intro_action
 from orders.ss_manager import StockStatusManager
+from general_settings.models import ReportSettings
+
+try:
+    report_settings=ReportSettings.objects.all()[0]
+except:
+    pass
 
 class OrderExecutionMsg(models.Model):
     """
@@ -191,7 +195,7 @@ class Report(models.Model):
                 a="strategies_in_use_intraday"
             else:
                 a="strategies_in_use"
-            
+
             for stock_ex in stock_exs: #sector is already in ust
                 strats=getattr(stock_ex,a).all()
                 self.perform_sub(strats,ust,ust.exchange,it_is_index=it_is_index)
@@ -315,7 +319,7 @@ class Report(models.Model):
         return name_to_ust_or_presel(
                 "StratHold",
                 None,
-                str(_settings["DAILY_REPORT_PERIOD"])+"y",
+                str(report_settings.daily_report_period)+"y",
                 prd=True,
                 actions=actions,
                 exchange=exchange,
@@ -364,7 +368,7 @@ class Report(models.Model):
                     self.save(testing=testing)
                     
                 #clean the symbols
-                actions=filter_intro_action(actions,_settings["DAILY_REPORT_PERIOD"])
+                actions=filter_intro_action(actions,report_settings.daily_report_period)
                 ##Perform a single strategy on predefined actions
                 #Uses afterward as source for the data to avoid loading them several times
                 ust_hold=self.init_ust(actions, exchange,it_is_index=it_is_index, **kwargs)
@@ -376,7 +380,7 @@ class Report(models.Model):
                         ust_ma=ic.VBTMA.run(ust_hold.close)
         
                         ust_trend=None
-                        if _settings["CALCULATE_TREND"]:
+                        if report_settings.calculate_trend:
                             ust_trend=name_to_ust_or_presel(
                                 "StratKamaStochMatrendMacdbbMacro",
                                 None,
@@ -515,3 +519,20 @@ class Alert(models.Model):
         else:
             return "none" + " " + str(self.trigger_date)
 
+class Scan(models.Model):
+    '''
+    To save scanner results
+    
+    Attributes
+   	----------
+       date: date of the scan
+       result: to save the JSON which result of the scanner
+    '''
+    date=models.DateTimeField(null=False, blank=False, auto_now_add=True)   #) default=timezone.now()
+    results=models.TextField(blank=True)
+    period=models.IntegerField(blank=True,null=True)
+    restriction=models.IntegerField(blank=True,null=True)
+    fees=models.FloatField(blank=True,null=True)
+    
+    def __str__(self):
+        return str(self.date)

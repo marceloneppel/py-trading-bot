@@ -12,6 +12,7 @@ from reporting.models import Alert
 from orders.models import Fees, StockEx, Action, ActionSector, ActionCategory, Strategy, Currency
 import vectorbtpro as vbt
 from datetime import time
+from tests.toolbox import create_general_settings
 
 class MockTelegramBot():
     def __init__(self):
@@ -21,8 +22,10 @@ class MockTelegramBot():
         pass
 
 class TestTelegram(TestCase):
+  
     @classmethod
     def setUpClass(self):
+        create_general_settings()
         super().setUpClass()
         
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
@@ -38,7 +41,7 @@ class TestTelegram(TestCase):
                                   opening_time=time(9,0),
                                   closing_time=time(17,30)
                                   )
-        c=Currency.objects.create(name="euro",symbol="EUR")
+        c=Currency.objects.get(symbol="EUR")
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         cat2=ActionCategory.objects.create(name="actions",short="ETFLONG")
         cat3=ActionCategory.objects.create(name="actions",short="ETFSHORT")

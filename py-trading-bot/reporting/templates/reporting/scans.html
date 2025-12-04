@@ -1,0 +1,7 @@
+<h1>Scans</h1>
+<table>
+    {% for scan in scans %}
+        <tr><td><a href="{% url 'reporting:scan_result' scan.id %}">{{scan.id}} {{ scan.date }}</a></td></tr>
+    {% endfor %}
+</table>
+<p><a href="{% url 'reporting:reports' %}">Main page</a></p>

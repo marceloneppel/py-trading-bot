@@ -1,0 +1,33 @@
+<h1>Scan parameters</h1>
+
+<p>Input for the scan</p>
+
+<form method='post' action=''>
+    {% csrf_token %}
+    <div class="fieldWrapper">
+        <label>List of stock exchanges to be included in the scan:</label><br/>
+        {{ form.list_of_exchanges }}
+    </div>
+    <div class="fieldWrapper">
+        <label>(Optional, normally for NYSE) List of sectors to be scanned:</label><br/>
+        {{form.list_of_sectors }}
+    </div>
+    <div class="fieldWrapper">
+        <label>List of strategies to be scanned:</label><br/>
+        {{form.strategies_to_scan }}
+    </div>
+    <div class="fieldWrapper">
+        <label>Number of years of the period to download in the past:</label><br/>
+        {{form.period }}
+    </div>    
+    <div class="fieldWrapper">
+        <label>(Optional) Reduced the analyzed windows to this number of days:</label><br/>
+        {{form.restriction }}
+    </div>            
+    <div class="fieldWrapper">
+        <label>Fees in pu (so 1%=0.01):</label><br/>
+        {{form.fees }}
+    </div>    
+    <br/>
+    <input type="submit" value="Trigger the scan">
+</form>

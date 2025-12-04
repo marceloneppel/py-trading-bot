@@ -2,54 +2,22 @@
 import os, sys
 
 _settings={
-      
-## Configuration of Telegram ##
-"PF_CHECK":True,
-"INDEX_CHECK":True,
-"REPORT":True, #for Paris and XETRA
-"INTRADAY":False,
-"HEARTBEAT":False, # to test telegram
-"HEARTBEAT_IB":False, # to test telegram, note ["USED_API_DEFAULT"]["alerting] must be set to IB otherwise, it makes no sense.
-"UPDATE_SLOW_STRAT":True, 
-
-"ALERT_THRESHOLD":3, #in %
-"ALARM_THRESHOLD":5, #in %
-"ALERT_HYST":1, #margin in % to avoid alert/recovery at high frequency, so if ALERT_THRESHOLD=3 and ALERT_HYST=1
-                #then the alert will be deactivated when the price variation is 2% (3-1)
-
-"TIME_INTERVAL_CHECK":10, #in minutes, interval between two checks of pf values
-"TIME_INTERVAL_UPDATE":60,
-"TIME_INTERVAL_INTRADAY":15,
-
-"OPENING_CHECK_MINUTE_SHIFT":5,
-"DAILY_REPORT_MINUTE_SHIFT":15,
-
+## API configurations
+#"IB_LOCALHOST":'127.0.0.1',
+#"IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496    
+    
 ## Order settings ##
-'''
-USED_API is handled as a global variable, it is not supposed to change often during the bot execution.
-USED_API_DEFAULT is the wanted value, USED_API is the evaluated value
-For instance, if you want (default) alerting with IB, but not all your symbols have the rights on IB, then YF will be used. 
-Another behavior would mean that the symbol without rights, would not be covered by the alerting
-'''
-
-"USED_API_DEFAULT":{
-    "orders": os.environ.get("USED_API_FOR_ORDER_PERF","IB"), #"IB", "MT5", "TS" or "CCXT" (YF does not allow performing orders)
-    "alerting":os.environ.get("USED_API_FOR_DATA_ALERTING","IB"), #"IB", "YF", "MT5", "TS" or "CCXT"
-    "reporting":os.environ.get("USED_API_FOR_DATA_REPORTING","YF"), #"IB", "YF", "MT5", "TS" or "CCXT"
-    },
+#USED_API is handled as a global variable, it is not supposed to change often during the bot execution.
+#USED_API_DEFAULT is the wanted value, USED_API is the evaluated value
+#For instance, if you want (default) alerting with IB, but not all your symbols have the rights on IB, then YF will be used. 
+#Another behavior would mean that the symbol without rights, would not be covered by the alerting
 "USED_API":{
     "orders": "", #don't modify
     "alerting":"",  #don't modify
     "reporting":"",  #don't modify
     },
-"IB_STOCK_NO_PERMISSION":["^NDX","^DJI","^IXIC"],
-
-"PERFORM_ORDER":True, #test or use IB to perform orders
 ## Configuration of the strategies ##
-
-# Frequency is the number of days between successive candidates actualisation
-"DAILY_REPORT_PERIOD":3, #in year
-
+#Only for calculation in notebook, when Django is off
 "VOL_MAX_CANDIDATES_NB":1,
 "MACD_VOL_MAX_CANDIDATES_NB":1,
 "HIST_VOL_MAX_CANDIDATES_NB":1,
@@ -69,21 +37,10 @@ Another behavior would mean that the symbol without rights, would not be covered
 "STOCH_LU":80,
 "BBAND_THRESHOLD":0.15,
 
-"CALCULATE_PATTERN":True, #pattern calculation is time consuming
-"CALCULATE_TREND":True,   #trend calculation is time consuming
-
-#for some major events, that cannot be detected only with technical analysis
-"FORCE_MACRO_TO":"", #"bull"/"uncertain"/""
+"FORCE_MACRO_TO":"", #to force the trend to certain value bull/bear or uncertain
 
 "STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
-          "PreselDivergenceBlocked","PreselWQ7","PreselWQ19","PreselWQ21","PreselWQ31","PreselWQ53","PreselWQ54"],
-
-## API configurations
-"IB_LOCALHOST":'127.0.0.1',
-"IB_PORT": os.environ.get("IB_PORT",7496), #IB Gateway 4001, TWS 7496
-
-"ETF_IB_auth":False, 
-"IB_BASE_CURRENCY":"EUR",
+          "PreselWQ7","PreselWQ19","PreselWQ21","PreselWQ31","PreselWQ53","PreselWQ54"],
 }
   
 """
@@ -137,6 +94,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'reporting.apps.ReportingConfig',
     'orders.apps.OrdersConfig',
+    'general_settings.apps.GeneralSettingsConfig',
     'django_filters'
     
 ]
@@ -179,9 +137,9 @@ WSGI_APPLICATION = 'trading_bot.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME':  os.getenv('POSTGRES_DB','migdb'),
+        'NAME':  os.getenv('POSTGRES_DB','pgtradingbotdb'),
         'USER': DB_USER,
-        'PASSWORD': DB_SECRET_KEY,
+        'PASSWORD':  DB_SECRET_KEY,
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
         'PORT': os.getenv('POSTGRES_PORT', '')
     }

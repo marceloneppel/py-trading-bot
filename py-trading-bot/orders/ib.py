@@ -30,10 +30,20 @@ logger_trade = logging.getLogger('trade')
 
 from orders.models import (Action, StockStatus, Order, Excluded, Strategy,
                           action_to_etf, pf_retrieve_all_symbols, check_if_index, check_ib_permission,
-                          get_pf, pf_retrieve_all)
+                          get_pf, pf_retrieve_all, IBSettings)
 
 #Module to handle IB connection
-ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
+from general_settings.models import OrderSettings
+
+try:
+    ib_settings=IBSettings.objects.all()[0]
+    order_settings=OrderSettings.objects.all()[0]
+except:
+    warnings.warn("ib_settings or order_settings were not loaded")   
+    pass
+
+#ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
+ib_cfg={"localhost":ib_settings.localhost,"port":ib_settings.port}
 ib_global={"connected":False, "client":None}
 
 '''
@@ -205,7 +215,7 @@ def actualize_ss(**kwargs):
     
     Here we don't need to check really the permission, we just want to check the pf
     '''
-    if _settings["USED_API_DEFAULT"]["orders"]=="IB":
+    if order_settings.default_api_orders.name=="IB":
         IBData.actualize_ss()
 
 #for SL check
@@ -222,11 +232,12 @@ def get_last_price(
     """     
   
     check_ib_permission([action.symbol],verbose=False) #to populate USED_API
+    stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
     cours_pres=0
    
     if (_settings["USED_API"]["alerting"]=="IB" and\
          action.stock_ex.ib_auth and\
-         action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
+         action.symbol not in stocks_no_permission_symbols):
 
          cours_pres=IBData.get_last_price(action)           
 
@@ -251,10 +262,11 @@ def get_ratio(action,**kwargs):
     cours_ref=0
     
     check_ib_permission([action.symbol],verbose=False) #to populate USED_API
+    stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
     
     if (_settings["USED_API"]["alerting"]=="IB" and\
         action.stock_ex.ib_auth and\
-        action.symbol not in _settings["IB_STOCK_NO_PERMISSION"]):
+        action.symbol not in stocks_no_permission_symbols):
         
         cours_pres, cours_ref= IBData.get_ratio_input(action)
 
@@ -405,6 +417,8 @@ class IBData(RemoteData):
             if symbol in exchanges:
                 exchange=exchanges[symbol]
                 
+                
+                
         it_is_index=False
         if it_is_indexes is not None:
             if symbol in it_is_indexes:
@@ -425,7 +439,7 @@ class IBData(RemoteData):
             #check period and timeframe
             bars = cls.client.reqHistoricalData(
                     contract,
-                    endDateTime=cls.convert_end_date(end),
+                    endDateTime=cls.convert_end_date(end),  #sent as datetime
                     durationStr=period, #"10 D","1 M"
                     barSizeSetting=timeframe, #"1 day", "1 min"
                     whatToShow='TRADES',
@@ -515,23 +529,23 @@ class IBData(RemoteData):
             quantity: amount to be converted
             inverse: convert in the other way
         """     
-        if currency==_settings["IB_BASE_CURRENCY"]:
+        if currency==ib_settings.base_currency.symbol:
             return quantity
         
         revert=False
         if currency in ["USD","GBP"]: #no need to make a try and fail
             revert=True
-            contract=Forex(_settings["IB_BASE_CURRENCY"]+currency)
+            contract=Forex(ib_settings.base_currency.symbol+currency)
         else:
             try:
-                contract=Forex(currency+_settings["IB_BASE_CURRENCY"])
+                contract=Forex(currency+ib_settings.base_currency.symbol)
             except:
-                contract=Forex(_settings["IB_BASE_CURRENCY"]+currency)
+                contract=Forex(ib_settings.base_currency.symbol+currency)
                 revert=True
         
         price=cls.get_last_price_sub(contract)
         if price==0 or np.isnan(price) and not revert:
-            contract=Forex(_settings["IB_BASE_CURRENCY"]+currency)
+            contract=Forex(ib_settings.base_currency.symbol+currency)
             revert=True
             price=cls.get_last_price_sub(contract)
         
@@ -898,20 +912,20 @@ class OrderPerformer():
         Similar to check_ib_permission
         """
         _settings["USED_API"]["orders"]="YF" #default
+        order_settings=OrderSettings.objects.all()[0]
+        stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
         
-        if self.action.stock_ex.perform_order and self.st.perform_order and _settings["PERFORM_ORDER"]: #auto
-            if _settings["USED_API_DEFAULT"]["orders"] in ["IB","CCXT","MT5","TS"]:
-                
-                _settings["USED_API"]["orders"]=_settings["USED_API_DEFAULT"]["orders"]
+        if self.action.stock_ex.perform_order and self.st.perform_order and order_settings.perform_order: #auto
+            if order_settings.default_api_orders.name in ["IB","CCXT","MT5","TS"]:
+                _settings["USED_API"]["orders"]=order_settings.default_api_orders.name
                 
             elif ( _settings["USED_API"]["orders"]=="IB" and
-                (self.action.symbol in _settings["IB_STOCK_NO_PERMISSION"]) and
+                (self.action.symbol in stocks_no_permission_symbols) and
                 (self.action.stock_ex.ib_auth) and
-                (not check_if_index(self.action) or (check_if_index(self.action) and _settings["ETF_IB_auth"])) #ETF trading requires too high permissions on IB, XETRA data too expansive
+                (not check_if_index(self.action) or (check_if_index(self.action) and ib_settings.etf_auth)) #ETF trading requires too high permissions on IB, XETRA data too expansive
                 (ib_global["connected"] and kwargs['client'])
                 ):
-                
-                _settings["USED_API"]["orders"]=_settings["USED_API_DEFAULT"]["orders"]
+                _settings["USED_API"]["orders"]=order_settings.default_api_orders.name
 
     def get_order(self,buy: bool):
         """

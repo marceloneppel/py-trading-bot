@@ -12,11 +12,8 @@ Advantage of backtesting from downloaded files:
 1. You don't have to download the data again and again
 2. They don't change. It makes comparison between strategies easier
 
-Additionally, you can backtest with recent prices, for instance last 3 years, in the notebooks live.ipynb. It includes also the function scan_presel_all() that will calculate the return of each preselection strategies for each stock exchanges obtained during the past x days (90 by default). If you have the impression that a strategy does not perform so well right now, it will confirm your doubt or not. The list of strategies tested is defined in trading_bot/settings.py in:
+# Scan
+Additionally, you can backtest with recent prices, for instance last 3 years, using the scan function on the home page. 
 
-    "STRATEGIES_TO_SCAN":["PreselVol","PreselRealMadrid","PreselRetard","PreselRetardMacro","PreselDivergence",
-          "PreselDivergenceBlocked","PreselWQ7","PreselWQ31","PreselWQ53","PreselWQ54"],    
-          
-The exchanges scanned are defined in the file stratL.
-    
-Note: for strategy on one stock, testing all stocks in the exchange would not make much sense, that's why it is not included in this scan.
+
+

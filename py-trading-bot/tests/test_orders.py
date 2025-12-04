@@ -10,6 +10,7 @@ from django.test import TestCase
 from orders import models as m
 from datetime import datetime
 from trading_bot.settings import _settings 
+from tests.toolbox import create_general_settings
 
 import sys
 if sys.version_info.minor>=9:
@@ -17,9 +18,16 @@ if sys.version_info.minor>=9:
 else:
     from backports.zoneinfo import ZoneInfo
     
+from general_settings.models import OrderSettings, API 
+    
 tz_Paris=ZoneInfo('Europe/Paris')
 
 class TestConversion(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()
+        
     def test_period_YF_to_ib(self):
         self.assertEqual(m.period_YF_to_ib("10"),None)
         self.assertEqual(m.period_YF_to_ib("10 d"),"10 D")
@@ -34,6 +42,11 @@ class TestConversion(TestCase):
         self.assertEqual(m.interval_YF_to_ib("10 d"),"10 day")
 
 class TestOrders(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()
+ 
     def setUp(self):
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
         
@@ -42,7 +55,7 @@ class TestOrders(TestCase):
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=False)
         self.e5=m.StockEx.objects.create(name="NASDAQ",fees=f,ib_ticker="NASDAQ",main_index=None,ib_auth=False)
-        c=m.Currency.objects.create(name="euro")
+        c=m.Currency.objects.get(symbol="EUR")
         self.c=c
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
@@ -217,11 +230,13 @@ class TestOrders(TestCase):
         self.assertEqual(self.a, m.symbol_to_action('AI',"Paris")) #ib ticker
         
     def test_check_ib_permission(self):
-        _settings["USED_API_DEFAULT"]={
-            "orders": "IB", 
-            "alerting": "IB", 
-            "reporting": "YF", 
-            }
+        order_settings=OrderSettings.objects.all()[0]
+        api1, _=API.objects.get_or_create(name="IB")
+        api2, _=API.objects.get_or_create(name="YF")
+
+        order_settings.default_api_reporting=api2
+        order_settings.save()
+
         _settings["USED_API"]={
             "orders": "", 
             "alerting": "", 
@@ -230,26 +245,27 @@ class TestOrders(TestCase):
         m.check_ib_permission(None)    #None copy
         self.assertEqual(_settings["USED_API"]["orders"],"IB")
         self.assertEqual(_settings["USED_API"]["alerting"],"IB")
-        self.assertEqual(_settings["USED_API"]["reporting"],"YF")
+        self.assertEqual(_settings["USED_API"]["reporting"],"YF") 
         
         m.check_ib_permission(["AI.PA","AC.PA"]) #Paris has auth
         self.assertEqual(_settings["USED_API"]["orders"],"IB")
         self.assertEqual(_settings["USED_API"]["alerting"],"IB")
         self.assertEqual(_settings["USED_API"]["reporting"],"YF")
 
+
+
         m.check_ib_permission(["AAPL"]) #Paris has auth
         self.assertEqual(_settings["USED_API"]["orders"],"YF")
         self.assertEqual(_settings["USED_API"]["alerting"],"YF")
         self.assertEqual(_settings["USED_API"]["reporting"],"YF")
-        
-        
-        
+
         #reset before or not should not have influence
         _settings["USED_API"]={
             "orders": "", 
             "alerting": "", 
             "reporting": "", 
             }
+        
         m.check_ib_permission(None)    #None copy
         self.assertEqual(_settings["USED_API"]["orders"],"IB")
         self.assertEqual(_settings["USED_API"]["alerting"],"IB")
@@ -277,7 +293,10 @@ class TestOrders(TestCase):
         self.assertEqual(_settings["USED_API"]["alerting"],"YF")
         self.assertEqual(_settings["USED_API"]["reporting"],"YF")        
         
-        _settings["IB_STOCK_NO_PERMISSION"]=["AI.PA"]
+        ib_settings=m.IBSettings.objects.all()[0]
+        ib_settings.stocks_no_permission.add(self.a)
+        ib_settings.save()
+        
         m.check_ib_permission(["AI.PA","AC.PA"]) #Paris has auth    
         self.assertEqual(_settings["USED_API"]["orders"],"YF")
         self.assertEqual(_settings["USED_API"]["alerting"],"YF")
@@ -294,12 +313,16 @@ class TestOrders(TestCase):
         self.assertEqual(_settings["USED_API"]["alerting"],"YF")
         self.assertEqual(_settings["USED_API"]["reporting"],"YF")  
         
-        _settings["USED_API_DEFAULT"]={
-            "orders": "CCXT", 
-            "alerting": "MT5", 
-            "reporting": "TS", 
-            }
         
+        api3, _=API.objects.get_or_create(name="CCXT")
+        api4, _=API.objects.get_or_create(name="MT5")
+        api5, _=API.objects.get_or_create(name="TS")
+
+        order_settings.default_api_orders=api3
+        order_settings.default_api_alerting=api4
+        order_settings.default_api_reporting=api5
+        order_settings.save()        
+
         m.check_ib_permission(["AI.PA","AC.PA"])    
         self.assertEqual(_settings["USED_API"]["orders"],"CCXT")
         self.assertEqual(_settings["USED_API"]["alerting"],"MT5")
