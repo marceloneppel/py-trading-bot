@@ -13,9 +13,16 @@ from orders.models import (Fees, StockEx, Action, ActionSector,
                           ActionCategory, Strategy, Currency, Candidates, Excluded,
                           get_exchange_actions, get_candidates)
 from reporting.models import Report
+from tests.toolbox import create_general_settings
 
 class TestPreselP(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()    
+    
     def setUp(self):
+        
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         cat=ActionCategory.objects.create(name="actions",short="ACT")
         strategy=Strategy.objects.create(name="none")
@@ -24,7 +31,7 @@ class TestPreselP(TestCase):
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
         e4=StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e=e
-        c=Currency.objects.create(name="euro",symbol="EUR")
+        c=Currency.objects.get(symbol="EUR")
         s=ActionSector.objects.create(name="sec")
         
         self.strategy=strategy

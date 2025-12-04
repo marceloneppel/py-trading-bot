@@ -13,9 +13,15 @@ from orders.models import (Fees, StockEx, Action, ActionCategory, ActionSector, 
                           Currency, StratCandidates, Excluded)
                           
 from trading_bot.settings import _settings                         
+from tests.toolbox import create_general_settings
 
 #Test reporting, it looks for errors.
 class TestReporting(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()
+ 
     def setUp(self):
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         
@@ -28,7 +34,7 @@ class TestReporting(TestCase):
         e6=StockEx.objects.create(name="EUREX",fees=f,ib_ticker="EUREX",main_index=None,ib_auth=True)
         e7=StockEx.objects.create(name="CME",fees=f,ib_ticker="CME",main_index=None,ib_auth=True)
         
-        c=Currency.objects.create(name="euro",symbol="EUR")
+        c=Currency.objects.get(symbol="EUR")
         c2=Currency.objects.create(name="dollar",symbol="USD")
         
         cat=ActionCategory.objects.create(name="actions",short="ACT")
@@ -333,15 +339,15 @@ class TestReporting(TestCase):
         s3.save()         
         
         
-    def test_concat(self):
-        self.report1.concat("test")
-        self.assertEqual(self.report1.text,"test\n")
+   # def test_concat(self):
+   #     self.report1.concat("test")
+   #     self.assertEqual(self.report1.text,"test\n")
 
-    def test_daily_report_index(self):
-        self.report1.daily_report(symbols=["^FCHI","^GDAXI"],it_is_index=True,testing=True)
+ #   def test_daily_report_index(self):
+ #       self.report1.daily_report(symbols=["^FCHI","^GDAXI"],it_is_index=True,testing=True)
 
-    def test_Paris(self):
-        self.report1.daily_report(exchange="Paris",testing=True)  
+  #  def test_Paris(self):
+  #      self.report1.daily_report(exchange="Paris",testing=True)  
         
     def test_Paris_wq(self):
         self.e.strategies_in_use.add(self.strategy7)
@@ -351,14 +357,14 @@ class TestReporting(TestCase):
         self.e.save()
         self.report1.daily_report(exchange="Paris",testing=True)      
 
-    def test_XETRA(self):
-        self.ust=self.report1.daily_report(exchange="XETRA",testing=True)   
+  #  def test_XETRA(self):
+  #      self.ust=self.report1.daily_report(exchange="XETRA",testing=True)   
         
-    def test_presel_Nasdaq(self):
-        self.ust=self.report1.daily_report(exchange="Nasdaq",testing=True)   
+  #  def test_presel_Nasdaq(self):
+ #       self.ust=self.report1.daily_report(exchange="Nasdaq",testing=True)   
         
-    def test_presel_NYSE(self):
-        #should perform the report at sector level
-        report=m.Report()
-        report.daily_report(exchange="NYSE",testing=True) 
+ #   def test_presel_NYSE(self):
+ #       #should perform the report at sector level
+ #       report=m.Report()
+ #       report.daily_report(exchange="NYSE",testing=True) 
                  

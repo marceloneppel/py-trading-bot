@@ -15,7 +15,7 @@ from orders.ss_manager import StockStatusManager
 from general_settings.models import ReportSettings
 
 try:
-    report_settings=ReportSettings.objects.get(pk=1)
+    report_settings=ReportSettings.objects.all()[0]
 except:
     pass
 
@@ -195,7 +195,7 @@ class Report(models.Model):
                 a="strategies_in_use_intraday"
             else:
                 a="strategies_in_use"
-            
+
             for stock_ex in stock_exs: #sector is already in ust
                 strats=getattr(stock_ex,a).all()
                 self.perform_sub(strats,ust,ust.exchange,it_is_index=it_is_index)

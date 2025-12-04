@@ -22,8 +22,15 @@ from orders import models as m
 from trading_bot.settings import _settings  
 from datetime import datetime, timedelta
 import pandas as pd
+from tests.toolbox import create_general_settings
+from general_settings.models import OrderSettings, API
 
 class TestIB(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()
+    
     def setUp(self):
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
         
@@ -31,7 +38,7 @@ class TestIB(TestCase):
         self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
-        c=m.Currency.objects.create(name="euro",symbol="EUR")
+        c=m.Currency.objects.get(symbol="EUR")
         self.c=c
         c2=m.Currency.objects.create(name="dollar",symbol="USD")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
@@ -199,8 +206,15 @@ class TestIB(TestCase):
         self.assertTrue(enough_cash)       
 
     def test_entry_order_manual(self):
-        _settings["PERFORM_ORDER"]=True
-        _settings["USED_API_DEFAULT"]["orders"]="IB"
+        order_settings=OrderSettings.objects.all()[0]
+        api1, _=API.objects.get_or_create(name="IB")
+
+        order_settings.default_api_orders=api1
+        order_settings.save()
+        
+        order_settings.perform_order=True
+        order_settings.save()
+
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         self.strategy.perform_order=False
         self.e.perform_order=False
@@ -232,11 +246,16 @@ class TestIB(TestCase):
         self.strategy.save()
         self.e.save()
         
+        print("yes yes")
+        
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.check_auto_manual()
         self.assertEqual(_settings["USED_API"]["orders"],"IB")
         
-        _settings["PERFORM_ORDER"]=False
+        order_settings.perform_order=False
+        order_settings.save()
+        
+        
         op=ib.OrderPerformer("AIR.PA",self.strategy.id,10000)
         op.check_auto_manual()
         self.assertEqual(_settings["USED_API"]["orders"],"YF")

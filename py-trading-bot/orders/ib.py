@@ -36,9 +36,10 @@ from orders.models import (Action, StockStatus, Order, Excluded, Strategy,
 from general_settings.models import OrderSettings
 
 try:
-    ib_settings=IBSettings.objects.get(pk=1)
-    order_settings=OrderSettings.objects.get(pk=1)
+    ib_settings=IBSettings.objects.all()[0]
+    order_settings=OrderSettings.objects.all()[0]
 except:
+    warnings.warn("ib_settings or order_settings were not loaded")   
     pass
 
 #ib_cfg={"localhost":_settings["IB_LOCALHOST"],"port":_settings["IB_PORT"]}
@@ -231,11 +232,12 @@ def get_last_price(
     """     
   
     check_ib_permission([action.symbol],verbose=False) #to populate USED_API
+    stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
     cours_pres=0
    
     if (_settings["USED_API"]["alerting"]=="IB" and\
          action.stock_ex.ib_auth and\
-         action.symbol not in ib_settings.stocks_no_permission):
+         action.symbol not in stocks_no_permission_symbols):
 
          cours_pres=IBData.get_last_price(action)           
 
@@ -260,10 +262,11 @@ def get_ratio(action,**kwargs):
     cours_ref=0
     
     check_ib_permission([action.symbol],verbose=False) #to populate USED_API
+    stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
     
     if (_settings["USED_API"]["alerting"]=="IB" and\
         action.stock_ex.ib_auth and\
-        action.symbol not in ib_settings.stocks_no_permission):
+        action.symbol not in stocks_no_permission_symbols):
         
         cours_pres, cours_ref= IBData.get_ratio_input(action)
 
@@ -909,19 +912,19 @@ class OrderPerformer():
         Similar to check_ib_permission
         """
         _settings["USED_API"]["orders"]="YF" #default
+        order_settings=OrderSettings.objects.all()[0]
+        stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
         
         if self.action.stock_ex.perform_order and self.st.perform_order and order_settings.perform_order: #auto
             if order_settings.default_api_orders.name in ["IB","CCXT","MT5","TS"]:
-                
                 _settings["USED_API"]["orders"]=order_settings.default_api_orders.name
                 
             elif ( _settings["USED_API"]["orders"]=="IB" and
-                (self.action.symbol in ib_settings.stocks_no_permission) and
+                (self.action.symbol in stocks_no_permission_symbols) and
                 (self.action.stock_ex.ib_auth) and
                 (not check_if_index(self.action) or (check_if_index(self.action) and ib_settings.etf_auth)) #ETF trading requires too high permissions on IB, XETRA data too expansive
                 (ib_global["connected"] and kwargs['client'])
                 ):
-                
                 _settings["USED_API"]["orders"]=order_settings.default_api_orders.name
 
     def get_order(self,buy: bool):

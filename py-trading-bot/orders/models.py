@@ -18,11 +18,6 @@ else:
     
 from general_settings.models import OrderSettings
 
-try:
-    order_settings=OrderSettings.objects.get(pk=1)
-except:
-    pass
-
 tz_Paris=ZoneInfo('Europe/Paris')
 
 all_tz=[]
@@ -716,8 +711,6 @@ class Job(models.Model):
     def __str__(self):
         return self.strategy.name + "_" + self.stock_ex.name
  
-    
- 
 class IBSettings(models.Model):
      localhost=models.CharField(max_length=100, blank=False,default='127.0.0.1')
      port=models.IntegerField(default=7496,verbose_name="IB port, typically 7496 for TWS and 4001 for IB Gateway") #IB Gateway 4001, TWS 7496
@@ -725,11 +718,11 @@ class IBSettings(models.Model):
      etf_auth=models.BooleanField(default=False)
      stocks_no_permission=models.ManyToManyField(Action,blank=True, related_name="stock_no_permission")    
 
-ib_settings=IBSettings.objects.get(pk=1)
+ib_settings=IBSettings.objects.all()[0]
 
 def check_ib_permission(symbols: list, verbose: bool=True):
     '''
-    Populate USED_API from USED_API_DEFAULT
+    Populate USED_API from general settings
     Check if IB can be used, otherwise YF is the fallback. For CCXT, MT5 and TS there is nothing to check.
     
     Needs to be performed for each set of symbols reported
@@ -738,17 +731,19 @@ def check_ib_permission(symbols: list, verbose: bool=True):
     ----------
        symbols: list of YF tickers
     '''
+    order_settings=OrderSettings.objects.all()[0]
     d={
        "orders": order_settings.default_api_orders.name, 
        "alerting":order_settings.default_api_alerting.name, 
        "reporting":order_settings.default_api_reporting.name, 
        }
-
+    
     for k, v in d.items():  #order_settings.default_api_alerting.name, 
-        if v in ["CCXT","MT5","TS"]:
+        if v in ["CCXT","MT5","TS","YF"]:
             _settings["USED_API"][k]=v
         elif v=="IB":
             stocks_no_permission_symbols=[a.symbol for a in ib_settings.stocks_no_permission.all()]
+            
             _settings["USED_API"][k]="IB"
             if symbols is not None: #symbol none -> clear
                 for symbol in symbols:
@@ -764,8 +759,6 @@ def check_ib_permission(symbols: list, verbose: bool=True):
                             logger.info("stock ex " + a.stock_ex.ib_ticker + " has no permission for IB for "+k + " impacting: "+symbol)
                         _settings["USED_API"][k]="YF"
                         break
-        elif v=="YF":
-            _settings["USED_API"][k]=v
     
 def get_exchange_actions(exchange:str,sec: str=None):
     '''

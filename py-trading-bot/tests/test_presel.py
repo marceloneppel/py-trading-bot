@@ -19,9 +19,16 @@ if sys.version_info.minor>=9:
     from zoneinfo import ZoneInfo
 else:
     from backports.zoneinfo import ZoneInfo
-    
+from tests.toolbox import create_general_settings  
+
 class TestBT(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()
+   
     def setUp(self):
+        
         self.period="2007_2022_08"
         self.symbol_index="CAC40"
         
@@ -29,7 +36,7 @@ class TestBT(TestCase):
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         
         self.e=m.StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
-        c=m.Currency.objects.create(name="euro")
+        c=m.Currency.objects.get(symbol="EUR")
         
         self.strategy=m.Strategy.objects.create(name="none",priority=10,target_order_size=1)
         self.s=m.ActionSector.objects.create(name="undefined")

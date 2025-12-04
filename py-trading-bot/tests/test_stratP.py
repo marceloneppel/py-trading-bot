@@ -12,15 +12,21 @@ import vectorbtpro as vbt
 import numpy as np
 from django.test import TestCase
 from orders.models import Action, ActionSector, StockEx, Currency, ActionCategory, Strategy, Fees
+from tests.toolbox import create_general_settings
 
 class TestStratP(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()        
+    
     def setUp(self):
         f=Fees.objects.create(name="zero",fixed=0,percent=0)
         
         e=StockEx.objects.create(name="Paris",fees=f,ib_ticker="SBF",main_index=None,ib_auth=True)
         e3=StockEx.objects.create(name="Nasdaq",fees=f,ib_ticker="SMART",main_index=None,ib_auth=True)
         e4=StockEx.objects.create(name="Monep",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
-        c=Currency.objects.create(name="euro", symbol="EUR")
+        c=Currency.objects.get(symbol="EUR")
         cat=ActionCategory.objects.create(name="actions")
         strategy=Strategy.objects.create(name="none")
         s=ActionSector.objects.create(name="sec")

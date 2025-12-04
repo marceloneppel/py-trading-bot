@@ -112,8 +112,8 @@ class MyScheduler():
         self.update_ss=True
         self.cleaning=True
         
-        scheduler_settings=SchedulerSettings.objects.get(pk=1)
-        alert_settings=AlertSettings.objects.get(pk=1)
+        scheduler_settings=SchedulerSettings.objects.all()[0]
+        alert_settings=AlertSettings.objects.all()[0]
         
         for s_ex in StockEx.objects.all():
             start_check_time=self.shift_time(s_ex.opening_time,scheduler_settings.opening_check_minute_shift,s_ex.timezone) #perform the check 5 min after opening
@@ -240,7 +240,7 @@ class MyScheduler():
             if ratio is None:
                 print("ratio is None for "+action.symbol)
                 
-            alert_settings=AlertSettings.objects.get(pk=1)
+            alert_settings=AlertSettings.objects.all()[0]
 
             if self.check_stock_ex_open_from_action(action) and ratio is not None:
                 if (short and ratio> alert_settings.alert_threshold) or (not short and ratio < -alert_settings.alert_threshold):

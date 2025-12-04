@@ -19,8 +19,14 @@ from django.test import TestCase
 from orders import models as m
 from core.data_manager_online import retrieve_data_online
 from trading_bot.settings import _settings
+from tests.toolbox import create_general_settings
 
 class TestDatamanagerOnline(TestCase):
+    @classmethod
+    def setUpClass(self):
+        create_general_settings()
+        super().setUpClass()
+    
     def setUp(self):
         f=m.Fees.objects.create(name="zero",fixed=0,percent=0)
         
@@ -28,7 +34,7 @@ class TestDatamanagerOnline(TestCase):
         self.e2=m.StockEx.objects.create(name="XETRA",fees=f,ib_ticker="IBIS",main_index=None,ib_auth=True)
         self.e3=m.StockEx.objects.create(name="MONEP",fees=f,ib_ticker="MONEP",main_index=None,ib_auth=True)
         self.e4=m.StockEx.objects.create(name="NYSE",fees=f,ib_ticker="NYSE",main_index=None,ib_auth=True)
-        c=m.Currency.objects.create(name="euro",symbol="EUR")
+        c=m.Currency.objects.get(symbol="EUR")
         c2=m.Currency.objects.create(name="dollar",symbol="USD")
         cat=m.ActionCategory.objects.create(name="actions",short="ACT")
         cat2=m.ActionCategory.objects.create(name="index",short="IND") #for action_to_etf
@@ -169,12 +175,25 @@ class TestDatamanagerOnline(TestCase):
         
     def test_retrieve_ib(self):
         _settings["USED_API"]["reporting"]="IB"
-        symbols=retrieve_data_online(self,self.actions,"1y") 
+        symbols, symbols_to_YF=retrieve_data_online(self,self.actions,"1y") 
             
         self.assertEqual(np.shape(self.close)[1],3)
         self.assertTrue(np.shape(self.close)[0]>200)
         self.assertTrue(np.shape(self.close_ind)[0]>200)
         self.assertEqual(np.shape(self.high)[1],3)
         self.assertTrue(np.shape(self.high)[0]>200)
+        
+    def test_retrieve_ib2(self):
+        _settings["USED_API"]["reporting"]="IB"
+        symbols, symbols_to_YF=retrieve_data_online(self,self.actions,"3y",add_index=False)
+        self.assertEqual(np.shape(self.close)[1],3)
+        self.assertTrue(np.shape(self.close)[0]>600)
+        t1=self.close.index[-1]
+
+        _settings["USED_API"]["reporting"]="IB"        
+        symbols, symbols_to_YF=retrieve_data_online(self,self.actions,"3y",end="2025-10-01",add_index=False)
+        t2=self.close.index[-1]
+
+        self.assertTrue(t1>t2)
 
 
